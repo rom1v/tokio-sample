@@ -1,36 +1,54 @@
 use std::time::Duration;
+use std::sync::Arc;
+
 use tokio;
 
 #[tokio::main]
 async fn main() {
     println!("Hello, world!");
 
-    let mut value = 0u32;
+    let notify = Arc::new(tokio::sync::Notify::new());
 
-    loop {
-        tokio::select! {
-            _ = f(&mut value) => {
-                println!("f called");
+    let fut = async move {
+        let fut_f = async move {
+            loop {
+                f().await;
             }
-            _ = g() => {
-                println!("g called");
-                value += 1000;
+        };
+        let fut_g = async move {
+            loop {
+                g().await;
             }
-            else => {
-                println!("end");
-                break;
-            }
+        };
+
+        tokio::join!(fut_f, fut_g);
+    };
+
+    tokio::spawn(stop_later(notify.clone()));
+
+    tokio::select! {
+        _ = fut => {
+            println!("fut_join");
+        }
+        _ = notify.notified() => {
+            println!("notified");
         }
     }
 }
 
-async fn f(value: &mut u32) {
-    println!("before: {value}");
+async fn f() {
+    println!("f() starts");
     tokio::time::sleep(Duration::from_millis(500)).await;
-    *value += 1;
-    println!("after: {value}");
+    println!("f() ends");
 }
 
 async fn g() {
+    println!("g() starts");
     tokio::time::sleep(Duration::from_millis(200)).await;
+    println!("g() ends");
+}
+
+async fn stop_later(notify: Arc<tokio::sync::Notify>) {
+    tokio::time::sleep(Duration::from_millis(2000)).await;
+    notify.notify_one();
 }
