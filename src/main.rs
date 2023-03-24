@@ -5,16 +5,19 @@ use tokio;
 async fn main() {
     println!("Hello, world!");
 
-    let mut value = 0u32;
-
+    tokio::pin! {
+        let fut_f = f();
+        let fut_g = g();
+    }
     loop {
         tokio::select! {
-            _ = f(&mut value) => {
+            _ = &mut fut_f => {
+                fut_f.set(f()); // .set() is a method on Pin
                 println!("f called");
             }
-            _ = g() => {
+            _ = &mut fut_g => {
+                fut_g.set(g()); // .set() is a method on Pin
                 println!("g called");
-                value += 1000;
             }
             else => {
                 println!("end");
@@ -24,11 +27,10 @@ async fn main() {
     }
 }
 
-async fn f(value: &mut u32) {
-    println!("before: {value}");
+async fn f() {
+    println!("before");
     tokio::time::sleep(Duration::from_millis(500)).await;
-    *value += 1;
-    println!("after: {value}");
+    println!("after");
 }
 
 async fn g() {
